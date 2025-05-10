@@ -12,3 +12,14 @@ serde_json = "1.0.140"
 sqlx = { version = "0.8.5", features = ["postgres", "runtime-tokio-rustls"] }
 tokio = { version = "1.45.0", features = ["full"] }
 uuid = { version = "1.16.0", features = ["v4"] }
+tower-http = { version = "0.5.2", features = ["cors"] }
+
+# Solana client dependencies
+solana-sdk = "1.18.8"
+solana-client = "1.18.8"
+solana-program = "1.18.8"
+anchor-client = "0.29.0"
+anyhow = "1.0.79"
+pyth-sdk-solana = "0.9.0"
+base64 = "0.22.1"
+dotenv = "0.15.0"
