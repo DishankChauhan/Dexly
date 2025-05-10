@@ -1,4 +1,12 @@
-import { Connection, Keypair, PublicKey, Transaction, SystemProgram, TransactionInstruction, sendAndConfirmTransaction } from '@solana/web3.js';
+import { 
+  Connection, 
+  Keypair, 
+  PublicKey, 
+  Transaction, 
+  SystemProgram, 
+  TransactionInstruction, 
+  sendAndConfirmTransaction
+} from '@solana/web3.js';
 import * as fs from 'fs';
 
 async function main() {
@@ -17,7 +25,7 @@ async function main() {
     const oracle = new PublicKey('J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix');
     
     // Find the global state PDA
-    const [globalState, _] = PublicKey.findProgramAddressSync(
+    const [globalState, bump] = PublicKey.findProgramAddressSync(
       [Buffer.from('global_state')],
       programId
     );
@@ -26,13 +34,15 @@ async function main() {
     console.log('Program ID:', programId.toString());
     console.log('Oracle pubkey:', oracle.toString());
     console.log('Global state PDA:', globalState.toString());
+    console.log('Global state bump:', bump);
     
-    // Create instruction data
+    // Create initialize instruction data
     // The first 8 bytes are the instruction discriminator for 'initialize'
     const data = Buffer.from([175, 175, 109, 31, 13, 152, 155, 237]);
     
-    // Create instruction
-    const instruction = new TransactionInstruction({
+    // Create initialize instruction
+    // Anchor's #[account(init)] handles account creation, so we just need the initialize instruction
+    const initializeIx = new TransactionInstruction({
       keys: [
         { pubkey: globalState, isSigner: false, isWritable: true },
         { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
@@ -44,7 +54,7 @@ async function main() {
     });
     
     // Create and send transaction
-    const transaction = new Transaction().add(instruction);
+    const transaction = new Transaction().add(initializeIx);
     
     console.log('Sending transaction...');
     const signature = await sendAndConfirmTransaction(
@@ -55,6 +65,13 @@ async function main() {
     
     console.log('Transaction successful!');
     console.log('Signature:', signature);
+    
+    // Check if the account was created
+    const accountInfo = await connection.getAccountInfo(globalState);
+    console.log('Account created:', accountInfo !== null);
+    if (accountInfo) {
+      console.log('Account data length:', accountInfo.data.length);
+    }
   } catch (error) {
     console.error('Error:', error);
   }
