@@ -215,6 +215,7 @@ impl SolanaClient {
                 position_account: position_keypair.pubkey(),
                 user_account,
                 user: wallet,
+                oracle_account: Pubkey::new_unique(),
                 system_program: system_program::ID,
             })
             .args(perpgo_instruction::OpenPosition {
@@ -442,6 +443,46 @@ impl SolanaClient {
             is_processing: self.is_processing.clone(),
         }
     }
+
+    // Find the global state PDA
+    fn find_global_state(&self) -> (Pubkey, u8) {
+        Pubkey::find_program_address(&[b"global_state".as_ref()], &self.program_id)
+    }
+
+    // Initialize the contract
+    pub async fn initialize_contract(&self, admin: &Pubkey, oracle: &Pubkey) -> Result<String> {
+        let program = self.get_anchor_program()?;
+        
+        // Find the global state PDA
+        let (global_state, _) = self.find_global_state();
+        
+        // Check if global state already exists
+        match self.rpc_client.get_account(&global_state) {
+            Ok(_) => {
+                return Err(anyhow!("Global state already initialized"));
+            },
+            Err(_) => {
+                // Global state doesn't exist, proceed with initialization
+            }
+        }
+        
+        // Build the transaction
+        let signature = program
+            .request()
+            .accounts(perpgo_accounts::Initialize {
+                global_state,
+                admin: *admin,
+                oracle: *oracle,
+                system_program: system_program::ID,
+            })
+            .args(perpgo_instruction::Initialize {})
+            .send()?;
+        
+        // Wait for confirmation
+        self.rpc_client.confirm_transaction(&signature)?;
+        
+        Ok(signature.to_string())
+    }
 }
 
 // Position data structure
@@ -468,10 +509,32 @@ mod perpgo_accounts {
     };
     
     #[derive(Clone)]
+    pub struct Initialize {
+        pub global_state: Pubkey,
+        pub admin: Pubkey,
+        pub oracle: Pubkey,
+        pub system_program: Pubkey,
+    }
+    
+    impl anchor_client::ToAccountMetas for Initialize {
+        fn to_account_metas(&self, is_signer: Option<bool>) -> Vec<anchor_client::solana_sdk::instruction::AccountMeta> {
+            use anchor_client::solana_sdk::instruction::AccountMeta;
+            
+            vec![
+                AccountMeta::new(self.global_state, false),
+                AccountMeta::new(self.admin, true),
+                AccountMeta::new_readonly(self.oracle, false),
+                AccountMeta::new_readonly(self.system_program, false),
+            ]
+        }
+    }
+
+    #[derive(Clone)]
     pub struct OpenPosition {
         pub position_account: Pubkey,
         pub user_account: Pubkey,
         pub user: Pubkey,
+        pub oracle_account: Pubkey,
         pub system_program: Pubkey,
     }
     
@@ -482,7 +545,8 @@ mod perpgo_accounts {
             vec![
                 AccountMeta::new(self.position_account, true),
                 AccountMeta::new(self.user_account, false),
-                AccountMeta::new_readonly(self.user, true),
+                AccountMeta::new(self.user, true),
+                AccountMeta::new_readonly(self.oracle_account, false),
                 AccountMeta::new_readonly(self.system_program, false),
             ]
         }
@@ -560,7 +624,7 @@ mod perpgo_instruction {
         fn data(&self) -> Vec<u8> {
             use anchor_client::anchor_lang::AnchorSerialize;
             let mut data = Vec::with_capacity(44);
-            data.extend_from_slice(&[141, 39, 226, 243, 12, 211, 96, 186]); // Discriminator for 'open_position'
+            data.extend_from_slice(&[204, 230, 123, 9, 35, 13, 111, 237]); // Discriminator for 'open_position'
             self.direction.serialize(&mut data).unwrap();
             self.collateral_amount.serialize(&mut data).unwrap();
             self.leverage.serialize(&mut data).unwrap();
@@ -575,7 +639,7 @@ mod perpgo_instruction {
         fn data(&self) -> Vec<u8> {
             use anchor_client::anchor_lang::AnchorSerialize;
             let mut data = Vec::with_capacity(8);
-            data.extend_from_slice(&[181, 41, 21, 21, 207, 68, 168, 30]); // Discriminator for 'close_position'
+            data.extend_from_slice(&[236, 77, 8, 172, 230, 217, 218, 84]); // Discriminator for 'close_position'
             data
         }
     }
@@ -587,7 +651,7 @@ mod perpgo_instruction {
         fn data(&self) -> Vec<u8> {
             use anchor_client::anchor_lang::AnchorSerialize;
             let mut data = Vec::with_capacity(8);
-            data.extend_from_slice(&[175, 175, 109, 31, 13, 152, 155, 237]); // Discriminator for 'create_user_account'
+            data.extend_from_slice(&[67, 180, 139, 36, 96, 133, 136, 111]); // Discriminator for 'create_user_account'
             data
         }
     }
@@ -600,9 +664,20 @@ mod perpgo_instruction {
     impl anchor_client::InstructionData for LiquidatePosition {
         fn data(&self) -> Vec<u8> {
             use anchor_client::anchor_lang::AnchorSerialize;
-            let mut data = Vec::with_capacity(8);
-            data.extend_from_slice(&[175, 175, 109, 31, 13, 152, 155, 237]); // Discriminator for 'liquidate_position'
+            let mut data = Vec::with_capacity(16);
+            data.extend_from_slice(&[119, 211, 211, 137, 32, 189, 109, 15]); // Discriminator for 'liquidate_position'
             self.current_price.serialize(&mut data).unwrap();
+            data
+        }
+    }
+    
+    #[derive(Clone)]
+    pub struct Initialize {}
+    
+    impl anchor_client::InstructionData for Initialize {
+        fn data(&self) -> Vec<u8> {
+            let mut data = Vec::with_capacity(8);
+            data.extend_from_slice(&[175, 175, 109, 31, 13, 152, 155, 237]); // Discriminator for 'initialize'
             data
         }
     }
