@@ -1,0 +1,7 @@
+---
+json_rpc_url: "http://localhost:8899"
+websocket_url: ""
+keypair_path: ~/.config/solana/id.json
+commitment: confirmed
+bpf_program:
+  max_len: 2000000 
