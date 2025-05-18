@@ -60,6 +60,8 @@ anchor deploy
 
 ## Architecture
 
+![Dexly Architecture ](https://github.com/user-attachments/assets/82bd5354-3d1f-4edd-b7e3-b0d0bb1d0ffe)
+
 ### Smart Contracts
 
 The Solana programs handle:
