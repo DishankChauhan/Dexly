@@ -1,100 +1,149 @@
-# Dexly - Perpetual Futures Trading on Solana
+# Dexly - Decentralized Perpetual Futures Trading on Solana
 
-Dexly is a decentralized perpetual futures trading platform built on the Solana blockchain using the Anchor framework. It enables users to open leveraged long or short positions on assets like SOL/USDC and BTC/USDC, with margin and collateral fully managed on-chain — without depending on a traditional orderbook. The platform uses smart contracts for execution and a Rust-based backend for off-chain indexing and real-time updates.
+Dexly is a high-performance decentralized perpetual futures trading platform built on the Solana blockchain. The platform enables traders to open leveraged long or short positions on crypto assets with up to 10x leverage, all managed through smart contracts deployed on Solana.
 
-Designed for transparency and performance, Dexly combines the speed of Solana with a clean trading interface built in Next.js, offering traders a seamless, trustless way to speculate on crypto prices with leverage.
-![Dexly Trading Platform Interface](./frontend/public/image/Home.png)
+Unlike traditional DEXs that rely on orderbooks, Dexly uses an innovative pricing model with a virtual AMM (Automated Market Maker) design to determine entry and exit prices. This approach allows for deep liquidity while maintaining performance and reducing front-running risks.
 
-## Project Structure
+## How Dexly Works
 
-The project is divided into three main components:
+Dexly implements a complete perpetual futures trading system with these key components:
 
-- **Frontend**: Next.js application with TailwindCSS for the UI
-- **Backend**: Rust server using Axum for API endpoints
-- **Smart Contracts**: Solana programs written in Rust with Anchor framework
+1. **Position Management**: Users can open long/short positions with collateral in USDC
+2. **Leverage Control**: Traders can select leverage up to 10x, amplifying potential gains (and losses)
+3. **Oracle Integration**: Real-time price feeds from Switchboard and Pyth oracles ensure accurate pricing
+4. **Liquidation Engine**: Automated liquidation processes protect the protocol from undercollateralized positions
+5. **Funding Rate Mechanism**: Periodic funding rates balance long and short positions 
+6. **Risk Management**: Sophisticated margin requirements maintain system solvency
 
-## Features
+## Technology Stack
 
-- Connect Phantom wallet
-- View real-time SOL/USD price charts
-- Open long/short positions with up to 10x leverage
-- View and manage open positions
-- Automatic liquidation system
-- PnL calculation
-- Next-Gen Trading Platform with digital interface
-- Lightning-fast execution on Solana
-- Real-time price charts and market data
-- Non-custodial architecture keeps your funds secure
+### Frontend
+- **Framework**: Next.js 13+ with App Router for server components
+- **UI/Styling**: TailwindCSS and Shadcn UI components
+- **State Management**: React Context API and SWR for data fetching
+- **Charting**: TradingView lightweight charts 
+- **Authentication**: Wallet adapter for Solana web3 authentication
+- **Language**: TypeScript for type safety
 
+### Backend
+- **Language**: Rust for high performance and safety
+- **Framework**: Axum web framework for handling HTTP requests
+- **Database**: PostgreSQL for persistent storage
+- **ORM**: SQLx for type-safe SQL queries
+- **API**: RESTful endpoints with JSON responses
+- **Real-time Updates**: WebSocket connections for live data
+- **Concurrency**: Tokio async runtime
+- **Monitoring**: Prometheus metrics collection
 
+### Smart Contracts (On-chain)
+- **Framework**: Anchor framework for Solana program development
+- **Language**: Rust
+- **Design Pattern**: Program Derived Addresses (PDAs) for account management
+- **Security**: Comprehensive security checks and validations
+- **Oracle Integration**: Switchboard and Pyth price feed integrations
+
+### Infrastructure
+- **Hosting**: Cloud-based deployment with containerization
+- **CI/CD**: Automated testing and deployment pipelines
+- **Monitoring**: Health checks and error reporting
+- **Database**: Managed PostgreSQL service
+
+## System Architecture
+
+![Dexly Architecture ](https://github.com/user-attachments/assets/82bd5354-3d1f-4edd-b7e3-b0d0bb1d0ffe)
+
+### Smart Contract Layer
+The on-chain Solana programs handle:
+- Opening and closing positions with account creation/management
+- Collateral deposit and withdrawal
+- Leverage calculation and enforcement
+- Oracle price feed integration
+- Liquidation threshold verification
+- Position PnL calculation
+- Funding rate adjustments
+
+### Backend Layer
+The Rust-based backend provides:
+- Database indexing of on-chain events
+- REST API endpoints for frontend data
+- WebSocket connections for real-time updates
+- Liquidation monitoring and execution
+- Historical data access and analytics
+- User account management and history
+- Market statistics calculation
+
+### Frontend Layer
+The Next.js frontend delivers:
+- Responsive trading interface optimized for desktop and mobile
+- Interactive TradingView price charts with indicators
+- Position management dashboard
+- Wallet integration for Phantom and other Solana wallets
+- Real-time price and position updates
+- Risk management indicators and warnings
+- Trading history and analytics
 
 ## Development Setup
 
 ### Prerequisites
+- Node.js 18+ and npm/yarn
+- Rust 1.70+ and Cargo
+- Solana CLI tools (1.16+)
+- Anchor framework 0.28+
+- PostgreSQL 14+
+- Docker (optional, for containerized development)
 
-- Node.js 16+
-- Rust and Cargo
-- Solana CLI
-- Anchor framework
-
-### Frontend Setup
-
+### Database Setup
 ```bash
-cd frontend
-npm install
-npm run dev
+cd perps-backend
+# Set up the PostgreSQL database
+./setup-db.sh
 ```
 
 ### Backend Setup
-
 ```bash
-cd backend
+cd perps-backend
+# Install dependencies and build
+cargo build
+# Run the server
 cargo run
 ```
 
-### Smart Contract Setup
-
+### Frontend Setup
 ```bash
-cd contracts/perpgo
+cd frontend
+# Install dependencies
+npm install
+# Run development server
+npm run dev
+```
+
+### Smart Contract Setup
+```bash
+cd perps
+# Build the program
 anchor build
+# Deploy to localnet/devnet
 anchor deploy
 ```
 
-## Architecture
+## Current Status and Roadmap
 
-![Dexly Architecture ](https://github.com/user-attachments/assets/82bd5354-3d1f-4edd-b7e3-b0d0bb1d0ffe)
+Dexly is currently in MVP phase with functional perpetual futures trading. The platform supports:
 
-### Smart Contracts
+- SOL/USDC and BTC/USDC markets
+- Up to 10x leverage trading
+- Real-time position management
+- Liquidation engine
 
-The Solana programs handle:
-- Opening and closing positions
-- Managing collateral
-- Calculating liquidation prices
-- Tracking funding rates
-
-### Backend
-
-The Rust backend provides:
-- REST API for position data
-- WebSocket for real-time updates
-- Liquidation bot monitoring
-- User history tracking
-
-### Frontend
-
-The Next.js frontend offers:
-- Interactive trading UI
-- Real-time price charts
-- Position management
-- Wallet integration
-
-## Current Status
-
-This is an MVP (Minimum Viable Product) with basic functionality. Future improvements will include:
-- More trading pairs
-- Advanced order types
-- Improved risk management
-- Enhanced charting capabilities
+### Upcoming Features
+- Cross-collateralization between positions
+- More trading pairs (ETH, AVAX, etc.)
+- Advanced order types (stop-loss, take-profit)
+- Portfolio margin
+- Mobile application
+- Trading competitions
+- Referral program
+- Institutional API access
 
 ## License
 
