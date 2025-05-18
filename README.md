@@ -1,6 +1,8 @@
 # Dexly - Perpetual Futures Trading on Solana
 
-Dexly is a decentralized perpetual futures trading platform inspired by Jupiter Perps, built on the Solana blockchain using the Anchor framework. It allows users to trade synthetic perpetual contracts on assets like SOL/USDC, BTC/USDC with leverage—without relying on an on-chain orderbook.
+Dexly is a decentralized perpetual futures trading platform built on the Solana blockchain using the Anchor framework. It enables users to open leveraged long or short positions on assets like SOL/USDC and BTC/USDC, with margin and collateral fully managed on-chain — without depending on a traditional orderbook. The platform uses smart contracts for execution and a Rust-based backend for off-chain indexing and real-time updates.
+
+Designed for transparency and performance, Dexly combines the speed of Solana with a clean trading interface built in Next.js, offering traders a seamless, trustless way to speculate on crypto prices with leverage.
 ![Dexly Trading Platform Interface](./frontend/public/image/Home.png)
 
 ## Project Structure
