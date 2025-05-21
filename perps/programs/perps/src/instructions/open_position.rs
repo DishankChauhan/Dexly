@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use crate::utils::oracle::{get_price, OracleType};
 use crate::utils::math::{calculate_fee, calculate_liquidation_price};
+use crate::utils::amm::{calculate_price_with_impact, update_market_reserves_for_open};
 use crate::error::PerpsError;
 use crate::constants::{MAX_LEVERAGE, MIN_LEVERAGE};
 
@@ -58,13 +59,13 @@ pub fn handler(
         PerpsError::MarketInactive
     );
     
-    // Get current price from oracle
+    // Get oracle price
     let oracle_type = OracleType::from(market.oracle_type);
-    let current_price = get_price(&ctx.accounts.oracle, oracle_type)?;
+    let oracle_price = get_price(&ctx.accounts.oracle, oracle_type)?;
     
     // Calculate position size based on collateral and leverage
     let position_size = Box::new(
-        *collateral_amount_boxed * *leverage_boxed as u64 / current_price
+        *collateral_amount_boxed * *leverage_boxed as u64 / oracle_price
     );
     
     // Validate position size
@@ -73,10 +74,25 @@ pub fn handler(
         PerpsError::PositionTooSmall
     );
     
+    // Calculate entry price with AMM impact
+    let entry_price = calculate_price_with_impact(
+        market,
+        *position_size,
+        *is_long_boxed,
+        oracle_price,
+    )?;
+    
+    // Update market reserves based on position
+    update_market_reserves_for_open(
+        market,
+        *position_size,
+        *is_long_boxed,
+    )?;
+    
     // Calculate liquidation price
     let liquidation_price = calculate_liquidation_price(
         *is_long_boxed,
-        current_price,
+        entry_price, // Use AMM price instead of oracle price
         *collateral_amount_boxed,
         *position_size,
         market.min_margin_ratio_bps,
@@ -85,7 +101,7 @@ pub fn handler(
     // Calculate fee
     let fee_amount = calculate_fee(*collateral_amount_boxed, market.fee_bps)?;
     
-    // Update market state
+    // Update market state for size tracking
     if *is_long_boxed {
         market.total_long_size = market.total_long_size
             .checked_add(*position_size)
@@ -105,7 +121,7 @@ pub fn handler(
     position.market = market.key();
     position.is_long = *is_long_boxed;
     position.size = *position_size;
-    position.entry_price = current_price;
+    position.entry_price = entry_price;
     position.collateral = *collateral_amount_boxed - fee_amount;
     position.leverage = *leverage_boxed;
     position.opened_at = current_ts;
@@ -128,7 +144,7 @@ pub fn handler(
         is_long: *is_long_boxed,
         size: *position_size,
         collateral: *collateral_amount_boxed - fee_amount,
-        entry_price: current_price,
+        entry_price,
         leverage: *leverage_boxed,
         liquidation_price,
         fee: fee_amount,

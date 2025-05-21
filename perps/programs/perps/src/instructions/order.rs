@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use crate::state::{market::Market, user::User};
 use crate::utils::oracle::{OracleType, get_price};
+use crate::utils::amm::{update_market_reserves_for_open, calculate_entry_price_with_impact_long, calculate_entry_price_with_impact_short};
 use crate::error::PerpsError;
 use crate::constants;
 
@@ -71,6 +72,12 @@ pub struct Order {
     
     /// Bump seed for PDA derivation
     pub bump: u8,
+    
+    /// Execution price of the order
+    pub execution_price: u64,
+    
+    /// Fee charged for the order
+    pub fee: u64,
 }
 
 /// Create and place an order
@@ -222,7 +229,7 @@ pub fn execute_order(accounts: &mut PlaceOrderAccounts, order: &mut Order, is_ma
     // Check for slippage if it's a market order
     if OrderType::from(order.order_type) == OrderType::Market {
         let max_slippage_bps = Box::new(order.max_slippage_bps as u128);
-        let order_price = Box::new(order.price as u128);
+        let order_price = Box::new(current_price as u128);
         
         // Calculate max allowed price deviation
         let max_deviation = Box::new(
@@ -533,165 +540,83 @@ pub fn execute_order_direct(
         return Err(error!(PerpsError::Unauthorized));
     }
     
-    // Get current price from oracle
-    let oracle_type = OracleType::from(market.oracle_type);
-    let current_price = get_price(oracle, oracle_type)?;
+    // Get current price from oracle for reference
+    let oracle_type = OracleType::try_from(market.oracle_type)
+        .map_err(|_| error!(PerpsError::InvalidOracleType))?;
     
-    // Check if order should be executed based on type
-    let should_execute = match OrderType::from(order.order_type) {
-        OrderType::Market => true, // Always execute market orders
-        OrderType::Limit => {
-            // Buy limit: execute if price <= limit price
-            // Sell limit: execute if price >= limit price
-            if order.is_long {
-                current_price <= order.price
-            } else {
-                current_price >= order.price
-            }
-        },
-        OrderType::StopLoss => {
-            // Buy stop: execute if price >= stop price
-            // Sell stop: execute if price <= stop price
-            if order.is_long {
-                current_price <= order.price
-            } else {
-                current_price >= order.price
-            }
-        },
-        OrderType::TakeProfit => {
-            // Buy take profit: execute if price <= take profit price
-            // Sell take profit: execute if price >= take profit price
-            if order.is_long {
-                current_price >= order.price
-            } else {
-                current_price <= order.price
-            }
+    let oracle_price = get_price(oracle, oracle_type)?;
+    let execution_price; // Don't initialize here, assign in each if branch
+    
+    // If this is a market order, use the AMM price with slippage
+    if is_market_execution {
+        // Use AMM price with slippage based on position size
+        if order.is_long {
+            execution_price = calculate_entry_price_with_impact_long(
+                market,
+                order.size
+            )?;
+        } else {
+            execution_price = calculate_entry_price_with_impact_short(
+                market,
+                order.size
+            )?;
         }
-    };
-    
-    // Only proceed if order should be executed
-    if !should_execute && !is_market_execution {
-        return Ok(());
-    }
-    
-    // Check for slippage if it's a market order
-    if OrderType::from(order.order_type) == OrderType::Market {
-        let max_slippage_bps = Box::new(order.max_slippage_bps as u128);
-        let order_price = Box::new(order.price as u128);
         
-        // Calculate max allowed price deviation
-        let max_deviation = Box::new(
-            (*order_price)
-                .checked_mul(*max_slippage_bps)
-                .ok_or(error!(PerpsError::Overflow))?
-                .checked_div(10_000)
-                .ok_or(error!(PerpsError::Overflow))?
-        );
+        // Check if price deviation is too high
+        let oracle_price_box = Box::new(oracle_price as u128);
+        let execution_price_box = Box::new(execution_price as u128);
         
-        // Check if current price is within slippage tolerance
-        let current_price_u128 = Box::new(current_price as u128);
-        
-        let price_diff = if *current_price_u128 > *order_price {
-            *current_price_u128 - *order_price
+        let price_diff = if *execution_price_box > *oracle_price_box {
+            execution_price_box.checked_sub(*oracle_price_box)
         } else {
-            *order_price - *current_price_u128
-        };
+            oracle_price_box.checked_sub(*execution_price_box)
+        }.ok_or(error!(PerpsError::Overflow))?;
         
-        require!(
-            price_diff <= *max_deviation,
-            PerpsError::SlippageTooHigh
-        );
-    }
-    
-    // Calculate position size and entry price
-    let position_size = Box::new(order.size);
-    let entry_price = Box::new(if is_market_execution {
-        current_price // Use current price for market orders
-    } else {
-        order.price // Use limit price for limit orders
-    });
-    
-    // Calculate liquidation price
-    let collateral = Box::new(order.collateral as u128);
-    let _leverage = Box::new(order.leverage as u128);
-    let _size_value = Box::new(
-        (*position_size as u128)
-            .checked_mul(*entry_price as u128)
+        let price_impact_bps = price_diff
+            .checked_mul(10_000)
             .ok_or(error!(PerpsError::Overflow))?
-            .checked_div(1_000_000) // Price is in 6 decimals
-            .ok_or(error!(PerpsError::Overflow))?
-    );
-    
-    // Calculate liquidation threshold
-    // For longs: entry_price - (collateral / size)
-    // For shorts: entry_price + (collateral / size)
-    let collateral_per_size = Box::new(
-        (*collateral)
-            .checked_mul(1_000_000) // Convert to same decimals as price
-            .ok_or(error!(PerpsError::Overflow))?
-            .checked_div(*position_size as u128)
-            .ok_or(error!(PerpsError::Overflow))?
-    );
-    
-    let margin_buffer = Box::new(
-        (*collateral_per_size)
-            .checked_mul(constants::MAINTENANCE_MARGIN_RATIO_BPS as u128)
-            .ok_or(error!(PerpsError::Overflow))?
-            .checked_div(10_000)
-            .ok_or(error!(PerpsError::Overflow))?
-    );
-    
-    let entry_price_u128 = Box::new(*entry_price as u128);
-
-    // For longs: entry_price - (collateral / size)
-    // For shorts: entry_price + (collateral / size)
-    let liquidation_price_u128 = if order.is_long {
-        if u128::from(*entry_price) <= *collateral_per_size {
-            Box::new(0u128) // Cannot be liquidated if entry price is less than collateral per size
-        } else {
-            Box::new(entry_price_u128.checked_sub(*collateral_per_size)
-                .ok_or(error!(PerpsError::Overflow))?
-                .checked_add(*margin_buffer)
-                .ok_or(error!(PerpsError::Overflow))?)
+            .checked_div(*oracle_price_box)
+            .ok_or(error!(PerpsError::Overflow))?;
+            
+        // Ensure price impact is within allowable limits
+        if price_impact_bps > market.max_price_impact_bps as u128 {
+            return Err(error!(PerpsError::PriceImpactTooHigh));
         }
     } else {
-        Box::new(entry_price_u128.checked_add(*collateral_per_size)
-            .ok_or(error!(PerpsError::Overflow))?
-            .checked_sub(*margin_buffer)
-            .ok_or(error!(PerpsError::Overflow))?)
-    };
-
-    // Check for overflow
-    if *liquidation_price_u128 > u64::MAX as u128 {
-        return Err(error!(PerpsError::Overflow));
+        // For limit orders, use the order's specified price
+        execution_price = order.price;
+        
+        // Verify that limit price is reasonable compared to current oracle price
+        if order.is_long {
+            // For long limit orders, execution price must be less than or equal to oracle price
+            if execution_price > oracle_price {
+                return Err(error!(PerpsError::PriceTooHigh));
+            }
+        } else {
+            // For short limit orders, execution price must be greater than or equal to oracle price
+            if execution_price < oracle_price {
+                return Err(error!(PerpsError::PriceTooLow));
+            }
+        }
     }
 
-    let _liquidation_price = *liquidation_price_u128 as u64;
+    // Calculate fee based on size (not used now, but we'll keep the calculation)
+    let _fee = crate::utils::math::calculate_fee(
+        order.size,
+        constants::PROTOCOL_FEE_BPS
+    )?;
     
-    // Update market with new position
-    if order.is_long {
-        market.total_long_size = market.total_long_size
-            .checked_add(*position_size)
-            .ok_or(error!(PerpsError::Overflow))?;
-    } else {
-        market.total_short_size = market.total_short_size
-            .checked_add(*position_size)
-            .ok_or(error!(PerpsError::Overflow))?;
-    }
-    
-    // Create position (will be created in a separate instruction)
-    // ...
-    
-    // Mark order as inactive (filled)
+    // Update order status
     order.is_active = false;
     
-    msg!(
-        "Order executed: type={}, direction={}, size={}, price={}",
-        order.order_type,
-        if order.is_long { "long" } else { "short" },
-        *position_size,
-        if is_market_execution { current_price } else { *entry_price }
-    );
+    // Update virtual AMM reserves for the market
+    if order.is_long {
+        // For long orders, decrease base asset reserve
+        update_market_reserves_for_open(market, order.size, true)?;
+    } else {
+        // For short orders, increase base asset reserve
+        update_market_reserves_for_open(market, order.size, false)?;
+    }
     
     Ok(())
 } 

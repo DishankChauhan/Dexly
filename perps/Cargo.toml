@@ -1,5 +1,5 @@
 [workspace]
-members = [ "perps-backend-rust",
+members = [
     "programs/*"
 ]
 resolver = "2"

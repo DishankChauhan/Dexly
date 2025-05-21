@@ -52,6 +52,21 @@ pub struct Market {
     
     /// Bump seed for PDA derivation
     pub bump: u8,
+    
+    /// Maximum price impact in basis points
+    pub max_price_impact_bps: u16,
+    
+    /// K factor to scale the virtual AMM
+    pub k_factor: u64,
+    
+    /// Minimum base asset reserve (safety parameter)
+    pub min_base_asset_reserve: u64,
+    
+    /// Minimum quote asset reserve (safety parameter)
+    pub min_quote_asset_reserve: u64,
+    
+    /// Maximum oracle price deviation allowed (in basis points)
+    pub max_oracle_deviation_bps: u16,
 }
 
 /// Market account context for initialization
@@ -81,6 +96,11 @@ pub struct InitializeMarket<'info> {
                1 +  // is_active
                32 + // authority
                8 +  // min_position_size
+               2 +  // max_price_impact_bps
+               8 +  // k_factor
+               8 +  // min_base_asset_reserve
+               8 +  // min_quote_asset_reserve
+               2 +  // max_oracle_deviation_bps
                1,   // bump
         seeds = [crate::constants::seeds::MARKET, market_id.to_le_bytes().as_ref()],
         bump

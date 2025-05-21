@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use crate::utils::oracle::{get_price, OracleType};
 use crate::utils::math::{calculate_pnl, calculate_fee};
 use crate::utils::funding::calculate_funding_payment;
+use crate::utils::amm::{calculate_price_with_impact, update_market_reserves_for_close};
 use crate::error::PerpsError;
 
 /// Close an existing position
@@ -32,9 +33,24 @@ pub fn handler(
         PerpsError::PositionClosed
     );
     
-    // Get current price from oracle
+    // Get oracle price for reference
     let oracle_type = OracleType::from(market.oracle_type);
-    let current_price = get_price(&ctx.accounts.oracle, oracle_type)?;
+    let oracle_price = get_price(&ctx.accounts.oracle, oracle_type)?;
+    
+    // Calculate exit price with AMM impact
+    let exit_price = calculate_price_with_impact(
+        market,
+        position.size,
+        !position.is_long, // Inverse for closing (buy for short, sell for long)
+        oracle_price
+    )?;
+    
+    // Update market reserves based on position closing
+    update_market_reserves_for_close(
+        market,
+        position.size,
+        position.is_long
+    )?;
     
     // Get current timestamp
     let clock = Box::new(Clock::get()?);
@@ -44,7 +60,7 @@ pub fn handler(
     let time_elapsed = Box::new(current_ts - position.last_funding_ts);
     
     // Calculate position value
-    let position_value = Box::new(position.size * current_price);
+    let position_value = Box::new(position.size * exit_price);
     
     // Calculate funding payment since last update
     let position_size = position.size;
@@ -57,11 +73,11 @@ pub fn handler(
         *time_elapsed
     )?;
     
-    // Calculate PnL
+    // Calculate PnL using AMM exit price
     let pnl = calculate_pnl(
         position.is_long,
         position.entry_price,
-        current_price,
+        exit_price,
         position.size,
     )?;
     
@@ -78,7 +94,7 @@ pub fn handler(
         Box::new(position.collateral.saturating_sub(-*total_pnl as u64).saturating_sub(fee_amount))
     };
     
-    // Update market state
+    // Update market state for size tracking
     if position.is_long {
         market.total_long_size = market.total_long_size
             .checked_sub(position.size)
@@ -121,7 +137,7 @@ pub fn handler(
         user: ctx.accounts.user.key(),
         market: market.key(),
         position: position.key(),
-        exit_price: current_price,
+        exit_price,
         pnl: *total_pnl,
         fee: fee_amount,
         return_amount: *return_amount,

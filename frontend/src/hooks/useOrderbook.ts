@@ -1,92 +1,91 @@
 import { useState, useEffect } from 'react';
-import { OrderbookData } from '@/types';
-import { api } from '@/services/api';
+import { OrderbookData, OrderbookEntry } from '@/types';
+import { apiService } from '@/services/api';
 
-export const useOrderbook = () => {
-  const [orderbook, setOrderbook] = useState<OrderbookData | null>(null);
+export const useOrderbook = (marketId: string) => {
+  const [bids, setBids] = useState<OrderbookEntry[]>([]);
+  const [asks, setAsks] = useState<OrderbookEntry[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!marketId) return;
+
     let isMounted = true;
-    let socket: WebSocket | null = null;
+    const fetchOrderbook = async () => {
+      try {
+        const data = await apiService.getOrderbook(marketId);
+        if (isMounted) {
+          setBids(data.bids);
+          setAsks(data.asks);
+          setLastUpdated(data.timestamp || Date.now());
+          setError(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError('Failed to fetch orderbook');
+          
+          // Generate mock data if API fails (for development)
+          generateMockOrderbook();
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    // Helper function to generate mock orderbook data
+    const generateMockOrderbook = () => {
+      // Use a fixed base price for consistent orderbook 
+      const basePrice = 100;
+      const mockBids: OrderbookEntry[] = [];
+      const mockAsks: OrderbookEntry[] = [];
+      
+      // Generate 15 bids (buy orders) below base price
+      for (let i = 0; i < 15; i++) {
+        const priceDelta = (i + 1) * 0.05;
+        const price = basePrice * (1 - priceDelta);
+        const size = Math.random() * 10 + 0.5; // Random size between 0.5 and 10.5
+        mockBids.push({ price, size });
+      }
+      
+      // Generate 15 asks (sell orders) above base price
+      for (let i = 0; i < 15; i++) {
+        const priceDelta = (i + 1) * 0.05;
+        const price = basePrice * (1 + priceDelta);
+        const size = Math.random() * 10 + 0.5; // Random size between 0.5 and 10.5
+        mockAsks.push({ price, size });
+      }
+      
+      // Sort bids in descending order (highest first)
+      mockBids.sort((a, b) => b.price - a.price);
+      // Sort asks in ascending order (lowest first)
+      mockAsks.sort((a, b) => a.price - b.price);
+      
+      setBids(mockBids);
+      setAsks(mockAsks);
+      setLastUpdated(Date.now());
+    };
 
     // Initial fetch
     fetchOrderbook();
-
-    // Set up WebSocket connection
-    const connectWebSocket = () => {
-      // WebSocket URL - adjust based on your environment
-      // Use the correct path that matches the backend WebSocket endpoint
-      const wsUrl = window.location.protocol === 'https:' 
-        ? `wss://${window.location.host}/api/ws/orderbook`
-        : `ws://${window.location.host}/api/ws/orderbook`;
-      
-      socket = new WebSocket(wsUrl);
-
-      socket.onopen = () => {
-        console.log('Orderbook WebSocket connected');
-      };
-
-      socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data) as OrderbookData;
-          if (isMounted) {
-            setOrderbook(data);
-            setIsLoading(false);
-          }
-        } catch (err) {
-          console.error('Error parsing orderbook data:', err);
-        }
-      };
-
-      socket.onerror = (event) => {
-        console.error('WebSocket error:', event);
-        if (isMounted) {
-          setError('WebSocket connection error');
-          
-          // If WebSocket fails, try to fetch data via REST API
-          fetchOrderbook();
-        }
-      };
-
-      socket.onclose = () => {
-        console.log('Orderbook WebSocket closed');
-        // Try to reconnect after a delay
-        if (isMounted) {
-          setTimeout(connectWebSocket, 3000);
-        }
-      };
-    };
-
-    // Try to connect via WebSocket
-    connectWebSocket();
-
-    // Cleanup function
+    
+    // Update orderbook every 2 seconds
+    const intervalId = setInterval(fetchOrderbook, 2000);
+    
     return () => {
       isMounted = false;
-      if (socket) {
-        socket.close();
-      }
+      clearInterval(intervalId);
     };
-  }, []);
-
-  const fetchOrderbook = async () => {
-    try {
-      const data = await api.getOrderbook();
-      setOrderbook(data);
-      setIsLoading(false);
-    } catch (err) {
-      console.error('Failed to fetch orderbook:', err);
-      setError('Failed to fetch orderbook data');
-      setIsLoading(false);
-    }
-  };
+  }, [marketId]);
 
   return {
-    orderbook,
+    bids,
+    asks,
+    lastUpdated,
     isLoading,
     error,
-    refetch: fetchOrderbook,
   };
 }; 

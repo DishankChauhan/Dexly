@@ -1,83 +1,141 @@
-import { Position, PriceData, OrderbookData } from '@/types';
+import { Position, PriceData, OrderbookData, Market, PriceImpactData, FundingRateDataPoint, UserStats, TransactionHistory } from '@/types';
+import axios from 'axios';
 
-const API_URL = '/api';
+// Create a base axios instance for API calls
+const api = axios.create({
+  baseURL: '/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
 // API service to interact with our backend
-export const api = {
-  // Get current price
-  async getCurrentPrice(): Promise<PriceData> {
-    const response = await fetch(`${API_URL}/price`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch price data');
-    }
-    return response.json();
+export const apiService = {
+  // Markets
+  async getMarkets(): Promise<Market[]> {
+    const response = await api.get('/markets');
+    return response.data;
   },
 
-  // Get positions for a wallet
-  async getPositionsByWallet(wallet: string): Promise<Position[]> {
-    const response = await fetch(`${API_URL}/positions/wallet`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(wallet),
+  async getMarket(marketId: string): Promise<Market> {
+    const response = await api.get(`/markets/${marketId}`);
+    return response.data;
+  },
+
+  async getMarketAMMData(marketId: string): Promise<Market> {
+    const response = await api.get(`/markets/${marketId}/amm`);
+    return response.data;
+  },
+
+  // Price
+  async getCurrentPrice(marketId: string): Promise<PriceData> {
+    const response = await api.get(`/markets/${marketId}/price`);
+    return response.data;
+  },
+
+  async getPriceHistory(marketId: string, timeframe: string = '1d'): Promise<{timestamp: number, price: number}[]> {
+    const response = await api.get(`/markets/${marketId}/price-history?timeframe=${timeframe}`);
+    return response.data;
+  },
+
+  // Price Impact
+  async calculatePriceImpact(marketId: string, size: number, direction: 'long' | 'short'): Promise<PriceImpactData> {
+    const response = await api.post(`/markets/${marketId}/price-impact`, {
+      size,
+      direction
     });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch positions');
-    }
-
-    return response.json();
+    return response.data;
   },
 
-  // Open a new position
+  // Funding Rates
+  async getCurrentFundingRate(marketId: string): Promise<number> {
+    const response = await api.get(`/markets/${marketId}/funding-rate`);
+    return response.data.rate;
+  },
+
+  async getFundingRateHistory(marketId: string, limit: number = 100): Promise<FundingRateDataPoint[]> {
+    const response = await api.get(`/markets/${marketId}/funding-history?limit=${limit}`);
+    return response.data;
+  },
+
+  // Positions
+  async getPositionsByWallet(walletAddress: string): Promise<Position[]> {
+    const response = await api.get(`/positions?wallet=${walletAddress}`);
+    return response.data;
+  },
+
+  async getPosition(positionId: string): Promise<Position> {
+    const response = await api.get(`/positions/${positionId}`);
+    return response.data;
+  },
+
   async openPosition(
-    wallet: string,
+    walletAddress: string,
+    marketId: string,
     direction: 'long' | 'short',
     size: number,
     leverage: number
   ): Promise<Position> {
-    const response = await fetch(`${API_URL}/positions/open`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        wallet,
-        direction,
-        size,
-        leverage,
-      }),
+    const response = await api.post('/positions', {
+      wallet: walletAddress,
+      market_id: marketId,
+      direction,
+      size,
+      leverage,
     });
-
-    if (!response.ok) {
-      throw new Error('Failed to open position');
-    }
-
-    return response.json();
+    return response.data;
   },
 
-  // Close a position
-  async closePosition(positionId: string): Promise<void> {
-    const response = await fetch(`${API_URL}/positions/close`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(positionId),
-    });
+  async closePosition(positionId: string): Promise<{ success: boolean, tx_signature?: string }> {
+    const response = await api.post(`/positions/${positionId}/close`);
+    return response.data;
+  },
 
-    if (!response.ok) {
-      throw new Error('Failed to close position');
-    }
+  // User Stats
+  async getUserStats(walletAddress: string): Promise<UserStats> {
+    const response = await api.get(`/users/${walletAddress}/stats`);
+    return response.data;
+  },
+
+  // Transaction History
+  async getTransactionHistory(walletAddress: string, limit: number = 20): Promise<TransactionHistory[]> {
+    const response = await api.get(`/users/${walletAddress}/transactions?limit=${limit}`);
+    return response.data;
   },
   
-  // Get orderbook data
-  async getOrderbook(): Promise<OrderbookData> {
-    const response = await fetch(`${API_URL}/orderbook`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch orderbook data');
-    }
-    return response.json();
+  // Orderbook
+  async getOrderbook(marketId: string): Promise<OrderbookData> {
+    const response = await api.get(`/markets/${marketId}/orderbook`);
+    return response.data;
   },
+  
+  // Admin Functions - requires admin key
+  async pauseMarket(marketId: string, adminKey: string): Promise<{ success: boolean }> {
+    const response = await api.post(`/admin/markets/${marketId}/pause`, {}, {
+      headers: {
+        'X-Admin-Key': adminKey
+      }
+    });
+    return response.data;
+  },
+  
+  async resumeMarket(marketId: string, adminKey: string): Promise<{ success: boolean }> {
+    const response = await api.post(`/admin/markets/${marketId}/resume`, {}, {
+      headers: {
+        'X-Admin-Key': adminKey
+      }
+    });
+    return response.data;
+  },
+  
+  async updateFundingRate(marketId: string, newRate: number, adminKey: string): Promise<{ success: boolean }> {
+    const response = await api.post(`/admin/markets/${marketId}/funding-rate`, {
+      rate: newRate
+    }, {
+      headers: {
+        'X-Admin-Key': adminKey
+      }
+    });
+    return response.data;
+  }
 }; 

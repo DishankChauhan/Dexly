@@ -51,7 +51,7 @@ pub mod __client_accounts_execute_order_context {
 }
 
 // Anchor program ID
-declare_id!("DFxJxFuiidqxqWEuewJ4G6oaZxfWGwT7ZKxX4mxe3Pz9");
+declare_id!("5YTxWRCWmTsy8JWCncwwKRKQguaigqNXxsDZLAqEJ7LB");
 
 // Context structs
 #[derive(Accounts)]
@@ -209,16 +209,30 @@ pub mod perps {
         min_margin_ratio_bps: u16,
         fee_bps: u16,
         min_position_size: u64,
+        max_price_impact_bps: u16,
+        k_factor: u64,
     ) -> Result<()> {
         require!(max_leverage >= constants::MIN_LEVERAGE && max_leverage <= constants::MAX_LEVERAGE, error::PerpsError::InvalidLeverage);
         require!(min_margin_ratio_bps >= constants::MAINTENANCE_MARGIN_RATIO_BPS, error::PerpsError::InvalidMarginRatio);
         require!(fee_bps <= constants::PROTOCOL_FEE_BPS * 10, error::PerpsError::InvalidFee);
+        require!(max_price_impact_bps <= 1000, error::PerpsError::InvalidPriceImpact); // Max 10% price impact
+        
+        // Get oracle price to set initial reserves
+        let oracle_type_enum = crate::utils::oracle::OracleType::from(oracle_type);
+        let initial_price = crate::utils::oracle::get_price(&ctx.accounts.oracle, oracle_type_enum)?;
+        
+        // Calculate initial reserves based on k_factor and initial price
+        // For balanced pool, use sqrt(k) * sqrt(price) for base and sqrt(k) / sqrt(price) for quote
+        let k = if k_factor == 0 { 10_000_000_000_000_000_000 } else { k_factor };
+        let base_asset_reserve = 1_000_000_000_000; // 1 trillion units (adjust based on asset decimals)
+        let quote_asset_reserve = (base_asset_reserve as u128 * initial_price as u128 / 1_000_000) as u64;
+        
         let mkt = &mut ctx.accounts.market;
         mkt.asset_symbol = asset_symbol;
         mkt.oracle = ctx.accounts.oracle.key();
         mkt.oracle_type = oracle_type;
-        mkt.base_asset_reserve = 0;
-        mkt.quote_asset_reserve = 0;
+        mkt.base_asset_reserve = base_asset_reserve;
+        mkt.quote_asset_reserve = quote_asset_reserve;
         mkt.funding_rate = 0;
         mkt.last_funding_ts = Clock::get()?.unix_timestamp;
         mkt.total_long_size = 0;
@@ -229,8 +243,13 @@ pub mod perps {
         mkt.is_active = true;
         mkt.authority = ctx.accounts.authority.key();
         mkt.min_position_size = min_position_size;
+        mkt.max_price_impact_bps = max_price_impact_bps;
+        mkt.k_factor = k;
+        mkt.min_base_asset_reserve = base_asset_reserve / 100; // 1% of initial
+        mkt.min_quote_asset_reserve = quote_asset_reserve / 100; // 1% of initial
+        mkt.max_oracle_deviation_bps = 1000; // Default 10% maximum deviation
         mkt.bump = *ctx.bumps.get("market").unwrap();
-        msg!("Initialized market for asset: {:?}", asset_symbol);
+        msg!("Initialized market for asset: {:?} with virtual AMM", asset_symbol);
         Ok(())
     }
 

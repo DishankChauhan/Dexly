@@ -3,157 +3,156 @@
 import { useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { usePositions } from '@/hooks/usePositions';
-import { usePriceData } from '@/hooks/usePriceData';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { solanaClient } from '@/services/solana';
 import Link from 'next/link';
 
-const PositionsList = () => {
-  const { publicKey } = useWallet();
-  const { positions, isLoading, error, closePosition } = usePositions();
-  const { priceData } = usePriceData();
-  const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
-  const [closeSignature, setCloseSignature] = useState<string | null>(null);
+interface PositionsListProps {
+  marketId?: string;
+}
 
+const PositionsList: React.FC<PositionsListProps> = ({ marketId }) => {
+  const { publicKey } = useWallet();
+  const { positions, closePosition, isLoading, error, stats } = usePositions(marketId);
+  const [closingPositionId, setClosingPositionId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [txSignature, setTxSignature] = useState<string | null>(null);
+  
+  const openPositions = positions.filter(pos => pos.status === 'open');
+  
   const handleClosePosition = async (positionId: string) => {
-    setClosingIds((prev) => new Set(prev).add(positionId));
     try {
+      setClosingPositionId(positionId);
+      setStatusMessage('Closing position...');
+      setTxSignature(null);
+      
       const result = await closePosition(positionId);
       
-      if (result.success && result.signature) {
-        setCloseSignature(result.signature);
+      if (result.success) {
+        setStatusMessage('Position closed successfully!');
+        if (result.signature) {
+          setTxSignature(result.signature);
+        }
+      } else {
+        setStatusMessage('Failed to close position');
       }
+    } catch (error) {
+      console.error('Error closing position:', error);
+      setStatusMessage('Error closing position');
     } finally {
-      setClosingIds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(positionId);
-        return newSet;
-      });
+      setClosingPositionId(null);
     }
   };
-
+  
   if (!publicKey) {
     return (
-      <div className="bg-gray-800 rounded-lg p-6 mt-6">
-        <h2 className="text-xl font-semibold mb-4">Your Positions</h2>
-        <div className="text-center py-8 text-gray-400">
-          Connect your wallet to view positions
+      <div className="bg-gray-800 rounded-lg p-8 text-center">
+        <h2 className="text-xl font-semibold mb-4">Connect Your Wallet</h2>
+        <p className="text-gray-400 mb-6">Connect your wallet to view your positions</p>
+        <div className="flex justify-center">
+          <WalletMultiButton />
         </div>
       </div>
     );
   }
-
+  
   return (
-    <div className="bg-gray-800 rounded-lg p-6 mt-6">
-      <h2 className="text-xl font-semibold mb-4">Your Positions</h2>
+    <div className="bg-gray-800 rounded-lg p-6">
+      <h2 className="text-xl font-semibold mb-4">
+        Your Positions {marketId ? `(${marketId})` : ''}
+      </h2>
       
-      {isLoading && (
-        <div className="text-center py-4">
-          <p className="text-gray-400">Loading positions...</p>
+      {isLoading ? (
+        <div className="text-center py-8">
+          <p>Loading positions...</p>
         </div>
-      )}
-      
-      {error && (
-        <div className="bg-red-900/20 text-red-200 p-4 rounded-md mb-4">
-          {error}
+      ) : error ? (
+        <div className="text-center py-8 text-red-400">
+          <p>{error}</p>
         </div>
-      )}
-      
-      {/* Display close transaction signature if present */}
-      {closeSignature && (
-        <div className="bg-blue-900/30 p-3 rounded-md text-sm mb-4">
-          <div className="flex justify-between items-center">
-            <span className="text-gray-300">Close Transaction:</span>
-            <Link
-              href={solanaClient.getExplorerUrl(closeSignature)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:text-blue-300 underline"
-            >
-              View on Explorer
-            </Link>
-          </div>
-          <div className="mt-1 text-xs text-gray-400 break-all">
-            {closeSignature}
-          </div>
-        </div>
-      )}
-      
-      {!isLoading && positions.length === 0 && (
+      ) : openPositions.length === 0 ? (
         <div className="text-center py-8 text-gray-400">
-          No open positions yet
+          <p>No open positions found</p>
+          <Link href="/trade" className="text-blue-400 hover:text-blue-300 mt-2 inline-block">
+            Open a position
+          </Link>
         </div>
-      )}
-      
-      {positions.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-700">
-            <thead>
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Direction</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Size</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Leverage</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Entry Price</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Liquidation</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">PnL</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-700">
-              {positions.map((position) => (
-                <tr key={position.id}>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      position.direction === 'long' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {position.direction.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {position.size.toFixed(4)} SOL
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {position.leverage}x
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    ${position.entry_price.toFixed(2)}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    ${position.liquidation_price.toFixed(2)}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={position.pnl >= 0 ? 'text-green-400' : 'text-red-400'}>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left border-b border-gray-700">
+                  <th className="py-3 px-4">Market</th>
+                  <th className="py-3 px-4">Side</th>
+                  <th className="py-3 px-4">Size</th>
+                  <th className="py-3 px-4">Leverage</th>
+                  <th className="py-3 px-4">Entry Price</th>
+                  <th className="py-3 px-4">Current Price</th>
+                  <th className="py-3 px-4">PnL</th>
+                  <th className="py-3 px-4">Funding</th>
+                  <th className="py-3 px-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {openPositions.map(position => (
+                  <tr key={position.id} className="border-b border-gray-700">
+                    <td className="py-3 px-4">{position.market_id}</td>
+                    <td className="py-3 px-4">
+                      <span className={position.direction === 'long' ? 'text-green-400' : 'text-red-400'}>
+                        {position.direction.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">{position.size.toFixed(3)} SOL</td>
+                    <td className="py-3 px-4">{position.leverage}x</td>
+                    <td className="py-3 px-4">${position.entry_price.toFixed(2)}</td>
+                    <td className="py-3 px-4">${position.current_price.toFixed(2)}</td>
+                    <td className={`py-3 px-4 ${position.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                       {position.pnl >= 0 ? '+' : ''}{position.pnl.toFixed(4)} SOL
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
+                      <span className="text-xs ml-1">
+                        ({position.pnl_percentage >= 0 ? '+' : ''}{position.pnl_percentage.toFixed(2)}%)
+                      </span>
+                    </td>
+                    <td className={`py-3 px-4 ${position.unrealized_funding >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {position.unrealized_funding >= 0 ? '+' : ''}{position.unrealized_funding.toFixed(4)} SOL
+                    </td>
+                    <td className="py-3 px-4">
                       <button
                         onClick={() => handleClosePosition(position.id)}
-                        disabled={closingIds.has(position.id)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1 rounded"
+                        disabled={closingPositionId === position.id}
+                        className={`bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-md text-sm ${
+                          closingPositionId === position.id ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
                       >
-                        {closingIds.has(position.id) ? 'Closing...' : 'Close'}
+                        {closingPositionId === position.id ? 'Closing...' : 'Close'}
                       </button>
-                      
-                      {position.tx_signature && (
-                        <Link
-                          href={solanaClient.getExplorerUrl(position.tx_signature)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-400 hover:text-blue-300"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </Link>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Transaction Status */}
+          {statusMessage && (
+            <div className="mt-4 p-3 bg-gray-700 rounded-md">
+              <p>{statusMessage}</p>
+              
+              {txSignature && (
+                <div className="mt-2 text-sm">
+                  <Link
+                    href={solanaClient.getExplorerUrl(txSignature)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300 underline"
+                  >
+                    View on Explorer
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -1,7 +1,6 @@
 'use client';
 
 import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePriceData } from '@/hooks/usePriceData';
@@ -16,6 +15,25 @@ import FeatureCard from '@/components/FeatureCard';
 import AccordionItem from '@/components/AccordionItem';
 import FloatingTokens from '@/components/FloatingTokens';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+import SafeImage from '@/components/SafeImage';
+
+// Import images
+// Remove image imports since we'll use public paths
+
+// Dynamically import Solana wallet component with SSR disabled
+const WalletMultiButton = dynamic(
+  () => import('@solana/wallet-adapter-react-ui').then(mod => mod.WalletMultiButton),
+  { ssr: false }
+);
+
+// Update image references in the component
+const images = {
+  hero: '/image1.png',
+  features: '/image2.png',
+  market: '/image3.png',
+  footer: '/image4.png'
+};
 
 export default function LandingPage() {
   const { publicKey } = useWallet();
@@ -23,8 +41,57 @@ export default function LandingPage() {
   const [isScrolling, setIsScrolling] = useState(false);
   const [chartData, setChartData] = useState<Array<{ time: string; value: number }>>([]);
   const router = useRouter();
+  const [imagesLoaded, setImagesLoaded] = useState(false);
   
   useEffect(() => {
+    // Log to verify image paths
+    console.log('Checking image paths...');
+    const imagePaths = Object.values(images);
+
+    Promise.all(
+      imagePaths.map(
+        path =>
+          new Promise((resolve, reject) => {
+            const img = new window.Image();
+            img.onload = () => {
+              console.log(`Image ${path} loaded successfully`);
+              resolve(true);
+            };
+            img.onerror = () => {
+              console.error(`Error loading ${path}`);
+              reject(new Error(`Failed to load ${path}`));
+            };
+            img.src = path;
+          })
+      )
+    )
+      .then(() => setImagesLoaded(true))
+      .catch(error => console.error('Image loading error:', error));
+  }, []);
+  
+  useEffect(() => {
+    // Log to verify client side rendering is happening
+    console.log("Component mounted");
+    
+    // Log if images exist at the paths
+    const checkImages = async () => {
+      try {
+        const img1 = await fetch('/image1.png');
+        const img2 = await fetch('/image2.png');
+        const img3 = await fetch('/image3.png');
+        const img4 = await fetch('/image4.png');
+        
+        console.log('Image1 status:', img1.status);
+        console.log('Image2 status:', img2.status);
+        console.log('Image3 status:', img3.status);
+        console.log('Image4 status:', img4.status);
+      } catch (error) {
+        console.error('Error checking images:', error);
+      }
+    };
+    
+    checkImages();
+    
     const handleScroll = () => {
       setIsScrolling(window.scrollY > 20);
     };
@@ -155,6 +222,16 @@ export default function LandingPage() {
       
       {/* Hero Section */}
       <div className="w-full bg-black relative overflow-hidden pt-24">
+        {/* Hero Background Image without overlay */}
+        <div className="absolute inset-0 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/image1.png"
+            alt="Hero Background"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        </div>
+
         <div className="absolute inset-0 opacity-30 pointer-events-none">
           <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-blue-900/20 to-purple-900/20"></div>
           <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-blue-600/30 blur-3xl"></div>
@@ -276,10 +353,18 @@ export default function LandingPage() {
         </div>
       </div>
       
-      
-      
       {/* Features Section (replacing Visual Showcase with coins) */}
       <div id="features-section" className="w-full bg-black py-20 relative overflow-hidden">
+        {/* Image without blended edges */}
+        <div className="absolute inset-0 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/image2.png"
+            alt="Feature section background"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        </div>
+          
         <div className="max-w-7xl mx-auto px-4 relative z-10">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold mb-6">Futuristic Trading Experience</h2>
@@ -357,6 +442,16 @@ export default function LandingPage() {
       
       {/* Market Section */}
       <div className="w-full bg-black py-20 relative">
+        {/* Image without diffused edges */}
+        <div className="absolute inset-0 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/image3.png"
+            alt="Market section background"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        </div>
+        
         <div className="absolute inset-0 opacity-20 pointer-events-none">
           <div className="absolute top-1/2 left-1/3 w-96 h-96 rounded-full bg-blue-600/20 blur-3xl"></div>
           <div className="absolute bottom-1/4 right-1/3 w-64 h-64 rounded-full bg-purple-600/20 blur-3xl"></div>
@@ -650,6 +745,15 @@ export default function LandingPage() {
       
       {/* Footer */}
       <footer className="w-full bg-black py-24 border-t border-gray-800 relative z-10">
+        {/* Footer background image without overlay */}
+        <div className="absolute inset-0 overflow-hidden -z-10">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/image4.png"
+            alt="Footer background"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        </div>
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
             <ParallaxEffect speed={6} direction="up" className="mb-8 md:mb-0">

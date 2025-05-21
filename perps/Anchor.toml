@@ -13,7 +13,7 @@ wallet = "./devnet-wallet.json"
 test = "yarn run mocha -t 1000000 tests/"
 
 [programs.localnet]
-perps = "DFxJxFuiidqxqWEuewJ4G6oaZxfWGwT7ZKxX4mxe3Pz9"
+perps = "5YTxWRCWmTsy8JWCncwwKRKQguaigqNXxsDZLAqEJ7LB"
 
 [workspace]
 types = "native"

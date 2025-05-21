@@ -12,7 +12,7 @@ const walletKeypair = Keypair.fromSecretKey(
 );
 
 // Constants
-const PROGRAM_ID = new PublicKey("DFxJxFuiidqxqWEuewJ4G6oaZxfWGwT7ZKxX4mxe3Pz9");
+const PROGRAM_ID = new PublicKey("5YTxWRCWmTsy8JWCncwwKRKQguaigqNXxsDZLAqEJ7LB");
 
 // Global variables for connection, wallet, provider and program
 let connection;

@@ -1,18 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Position } from '@/types';
-import { api } from '@/services/api';
+import { apiService } from '@/services/api';
 
 interface ClosePositionResult {
   success: boolean;
   signature?: string;
 }
 
-export const usePositions = () => {
+export const usePositions = (marketId?: string) => {
   const { publicKey } = useWallet();
   const [positions, setPositions] = useState<Position[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Filter to only include positions for the specified market, if provided
+  const filteredPositions = marketId 
+    ? positions.filter(pos => pos.market_id === marketId)
+    : positions;
 
   useEffect(() => {
     if (!publicKey) {
@@ -24,10 +29,13 @@ export const usePositions = () => {
     let isMounted = true;
     const fetchPositions = async () => {
       try {
+        setIsLoading(true);
         const walletAddress = publicKey.toString();
-        const data = await api.getPositionsByWallet(walletAddress);
+        const data = await apiService.getPositionsByWallet(walletAddress);
+        
         if (isMounted) {
           setPositions(data);
+          setError(null);
           setIsLoading(false);
         }
       } catch (err) {
@@ -50,7 +58,8 @@ export const usePositions = () => {
   const openPosition = async (
     direction: 'long' | 'short',
     size: number,
-    leverage: number
+    leverage: number,
+    marketIdToUse: string = 'SOL-PERP' // Default market
   ) => {
     if (!publicKey) {
       setError('Wallet not connected');
@@ -59,17 +68,22 @@ export const usePositions = () => {
 
     try {
       setIsLoading(true);
-      const newPosition = await api.openPosition(
+      setError(null);
+      
+      const newPosition = await apiService.openPosition(
         publicKey.toString(),
+        marketIdToUse,
         direction,
         size,
         leverage
       );
+      
       setPositions((prev) => [...prev, newPosition]);
       setIsLoading(false);
       return newPosition;
-    } catch (err) {
-      setError('Failed to open position');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || 'Failed to open position';
+      setError(errorMessage);
       setIsLoading(false);
       return null;
     }
@@ -78,29 +92,54 @@ export const usePositions = () => {
   const closePosition = async (positionId: string): Promise<ClosePositionResult> => {
     try {
       setIsLoading(true);
-      await api.closePosition(positionId);
+      setError(null);
       
-      setPositions((prev) => prev.filter((p) => p.id !== positionId));
+      const result = await apiService.closePosition(positionId);
+      
+      if (result.success) {
+        // Update local state to mark position as closed
+        setPositions((prev) => 
+          prev.map(p => p.id === positionId 
+            ? {...p, status: 'closed' as const} 
+            : p
+          )
+        );
+      }
+      
       setIsLoading(false);
-      
-      // In a real blockchain implementation, this would return the transaction signature
-      // For now, we're returning a mock signature since our API doesn't return real signatures
-      return { 
-        success: true,
-        signature: undefined // Our mock API doesn't return a real signature yet
-      };
-    } catch (err) {
-      setError('Failed to close position');
+      return result;
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || 'Failed to close position';
+      setError(errorMessage);
       setIsLoading(false);
       return { success: false };
     }
   };
 
+  // Calculate aggregate stats for displayed positions
+  const totalPnl = filteredPositions
+    .filter(p => p.status === 'open')
+    .reduce((sum, pos) => sum + pos.pnl, 0);
+  
+  const totalFundingPnl = filteredPositions
+    .filter(p => p.status === 'open')
+    .reduce((sum, pos) => sum + pos.unrealized_funding, 0);
+  
+  const totalCollateral = filteredPositions
+    .filter(p => p.status === 'open')
+    .reduce((sum, pos) => sum + pos.collateral, 0);
+
   return {
-    positions,
+    positions: filteredPositions,
     isLoading,
     error,
     openPosition,
     closePosition,
+    stats: {
+      totalPnl,
+      totalFundingPnl,
+      totalCollateral,
+      openPositionsCount: filteredPositions.filter(p => p.status === 'open').length
+    }
   };
 }; 

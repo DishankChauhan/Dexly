@@ -42,8 +42,8 @@ describe("Perps Trading Protocol - Complete Test", () => {
 
   // Load the IDL file
   const idl = JSON.parse(idlData);
-  console.log('Program ID:', 'DFxJxFuiidqxqWEuewJ4G6oaZxfWGwT7ZKxX4mxe3Pz9');
-  const programId = new PublicKey('DFxJxFuiidqxqWEuewJ4G6oaZxfWGwT7ZKxX4mxe3Pz9');
+  console.log('Program ID:', '5YTxWRCWmTsy8JWCncwwKRKQguaigqNXxsDZLAqEJ7LB');
+  const programId = new PublicKey('5YTxWRCWmTsy8JWCncwwKRKQguaigqNXxsDZLAqEJ7LB');
   const program = new Program(idl, programId, provider);
   
   // Key accounts

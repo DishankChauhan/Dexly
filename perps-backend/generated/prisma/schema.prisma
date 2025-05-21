@@ -1,0 +1,214 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id
+  publicKey String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  positions Position[]
+  orders    Order[]
+  trades    Trade[]    @relation("UserTrades")
+}
+
+model Market {
+  id                String           @id
+  assetSymbol       String
+  marketAddress     String           @unique
+  baseAssetReserve  Decimal          @db.Decimal(30, 9)
+  quoteAssetReserve Decimal          @db.Decimal(30, 9)
+  fundingRate       Decimal          @db.Decimal(30, 9)
+  lastFundingTs     BigInt
+  totalLongSize     Decimal          @db.Decimal(30, 9)
+  totalShortSize    Decimal          @db.Decimal(30, 9)
+  maxLeverage       Int
+  minMarginRatioBps Int
+  feeBps            Int
+  isActive          Boolean
+  minPositionSize   Decimal          @db.Decimal(30, 9)
+  maxPriceImpactBps Int
+  kFactor           Decimal          @db.Decimal(30, 9)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  positions         Position[]
+  orders            Order[]
+  trades            Trade[]
+  fundingPayments   FundingPayment[]
+  liquidations      Liquidation[]
+  priceHistory      PriceHistory[]
+}
+
+model Position {
+  id                     String           @id
+  positionAddress        String           @unique
+  userId                 String
+  marketId               String
+  isLong                 Boolean
+  size                   Decimal          @db.Decimal(30, 9)
+  entryPrice             Decimal          @db.Decimal(30, 9)
+  collateral             Decimal          @db.Decimal(30, 9)
+  leverage               Int
+  openedAt               BigInt
+  lastFundingTs          BigInt
+  realizedPnlFromFunding Decimal          @db.Decimal(30, 9)
+  liquidationPrice       Decimal          @db.Decimal(30, 9)
+  isClosed               Boolean          @default(false)
+  closedAt               BigInt?
+  closingPrice           Decimal?         @db.Decimal(30, 9)
+  realizedPnl            Decimal?         @db.Decimal(30, 9)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  user                   User             @relation(fields: [userId], references: [id])
+  market                 Market           @relation(fields: [marketId], references: [id])
+  fundingPayments        FundingPayment[]
+  liquidation            Liquidation?
+  trades                 Trade[]
+}
+
+model Order {
+  id             String  @id
+  userId         String
+  marketId       String
+  orderType      Int // 0: Market, 1: Limit, 2: StopLoss, 3: TakeProfit
+  isLong         Boolean
+  size           String
+  price          String
+  collateral     String
+  leverage       Int
+  isActive       Boolean @default(true)
+  maxSlippageBps Int     @default(100)
+  createdAt      String
+  positionId     String?
+  executionPrice String?
+  executedAt     String?
+  cancelledAt    String?
+  txHash         String?
+  lastError      String?
+  user           User    @relation(fields: [userId], references: [id])
+  market         Market  @relation(fields: [marketId], references: [id])
+  trades         Trade[]
+
+  @@index([userId, isActive])
+  @@index([marketId, isActive])
+  @@index([positionId])
+}
+
+model Trade {
+  id         String    @id
+  orderId    String
+  positionId String
+  userId     String
+  marketId   String
+  side       OrderSide
+  size       Decimal   @db.Decimal(30, 9)
+  price      Decimal   @db.Decimal(30, 9)
+  fee        Decimal   @db.Decimal(30, 9)
+  txHash     String
+  createdAt  DateTime  @default(now())
+  order      Order     @relation(fields: [orderId], references: [id])
+  position   Position  @relation(fields: [positionId], references: [id])
+  market     Market    @relation(fields: [marketId], references: [id])
+  user       User      @relation("UserTrades", fields: [userId], references: [id])
+}
+
+model FundingPayment {
+  id         String   @id
+  marketId   String
+  positionId String
+  amount     Decimal  @db.Decimal(30, 9)
+  rate       Decimal  @db.Decimal(30, 9)
+  timestamp  BigInt
+  txHash     String?
+  createdAt  DateTime @default(now())
+  market     Market   @relation(fields: [marketId], references: [id])
+  position   Position @relation(fields: [positionId], references: [id])
+}
+
+model Liquidation {
+  id                 String   @id
+  positionId         String   @unique
+  liquidator         String?
+  liquidationPrice   Decimal  @db.Decimal(30, 9)
+  collateralReturned Decimal  @db.Decimal(30, 9)
+  fee                Decimal  @db.Decimal(30, 9)
+  txHash             String
+  timestamp          BigInt
+  createdAt          DateTime @default(now())
+  position           Position @relation(fields: [positionId], references: [id])
+  market             Market   @relation(fields: [marketId], references: [id])
+  marketId           String
+}
+
+model PriceHistory {
+  id         String   @id @default(uuid())
+  marketId   String
+  markPrice  Decimal  @db.Decimal(30, 9)
+  indexPrice Decimal  @db.Decimal(30, 9)
+  timestamp  BigInt
+  createdAt  DateTime @default(now())
+  market     Market   @relation(fields: [marketId], references: [id])
+}
+
+// Enums
+enum OrderType {
+  MARKET
+  LIMIT
+}
+
+enum OrderSide {
+  LONG
+  SHORT
+}
+
+enum OrderStatus {
+  OPEN
+  FILLED
+  PARTIALLY_FILLED
+  CANCELED
+  EXPIRED
+}
+
+// Add SystemHealth model for monitoring
+model SystemHealth {
+  id        String @id
+  component String
+  status    String
+  metrics   String
+  timestamp String
+}
+
+// Add LiquidationAttempt model
+model LiquidationAttempt {
+  id               String @id
+  positionId       String
+  marketId         String
+  timestamp        String
+  currentPrice     String
+  liquidationPrice String
+  status           String
+}
+
+// Add FundingSettlement model
+model FundingSettlement {
+  id            String @id
+  marketId      String
+  timestamp     String
+  rate          String
+  totalAmount   String
+  longAmount    String
+  shortAmount   String
+  positionCount Int
+}

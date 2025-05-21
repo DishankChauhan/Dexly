@@ -6,10 +6,10 @@ const assert = require("assert");
 describe("Perps Program Minimal Test", () => {
   it("Should verify the program is deployed", () => {
     try {
-      const output = execSync("solana program show --output json DFxJxFuiidqxqWEuewJ4G6oaZxfWGwT7ZKxX4mxe3Pz9").toString();
+      const output = execSync("solana program show --output json 5YTxWRCWmTsy8JWCncwwKRKQguaigqNXxsDZLAqEJ7LB").toString();
       console.log("Program info:", output);
       const programInfo = JSON.parse(output);
-      assert.strictEqual(programInfo.programId, "DFxJxFuiidqxqWEuewJ4G6oaZxfWGwT7ZKxX4mxe3Pz9");
+      assert.strictEqual(programInfo.programId, "5YTxWRCWmTsy8JWCncwwKRKQguaigqNXxsDZLAqEJ7LB");
       console.log("Program is deployed successfully!");
     } catch (error) {
       console.error("Error fetching program info:", error.message);

@@ -7,7 +7,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:3000/:path*',
+        destination: 'http://localhost:3000/api/:path*',
       },
     ];
   },
@@ -15,7 +15,7 @@ const nextConfig = {
   onError(err: Error) {
     console.warn('Next.js API error:', err);
   },
-  // Configure allowed image domains
+  // Configure image handling
   images: {
     domains: ['framerusercontent.com'],
     remotePatterns: [
@@ -24,7 +24,14 @@ const nextConfig = {
         hostname: 'framerusercontent.com',
         pathname: '/images/**',
       },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3000',
+        pathname: '/**',
+      },
     ],
+    unoptimized: true, // Allow serving static images from public directory
   },
 };
 

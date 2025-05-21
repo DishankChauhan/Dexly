@@ -97,4 +97,36 @@ pub enum PerpsError {
     
     #[msg("Invalid order type")]
     InvalidOrderType,
+    
+    /// Invalid price impact
+    #[msg("Invalid price impact parameters")]
+    InvalidPriceImpact,
+    
+    /// Price impact too high
+    #[msg("Price impact exceeds maximum allowed")]
+    PriceImpactTooHigh,
+    
+    /// AMM reserves below minimum
+    #[msg("AMM reserves below minimum threshold")]
+    ReservesBelowMinimum,
+    
+    /// Oracle price deviation too high
+    #[msg("Oracle price deviation exceeds maximum allowed")]
+    OracleDeviationTooHigh,
+    
+    /// Invalid AMM parameter
+    #[msg("Invalid AMM parameter")]
+    InvalidAmmParameter,
+    
+    /// Invalid Oracle type
+    #[msg("Invalid oracle type")]
+    InvalidOracleType,
+    
+    /// Price Too High
+    #[msg("Price is too high")]
+    PriceTooHigh,
+    
+    /// Price Too Low
+    #[msg("Price is too low")]
+    PriceTooLow,
 } 
