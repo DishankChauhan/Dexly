@@ -1,4 +1,7 @@
 # Dexly - Decentralized Perpetual Futures Trading on Solana
+![Home](https://github.com/user-attachments/assets/5d278f12-b682-425e-8c99-2e90c46a4c68)
+
+
 
 Dexly is a high-performance decentralized perpetual futures trading platform built on the Solana blockchain. The platform enables traders to open leveraged long or short positions on crypto assets with up to 10x leverage, all managed through smart contracts deployed on Solana.
 
