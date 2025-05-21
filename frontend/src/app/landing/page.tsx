@@ -29,10 +29,10 @@ const WalletMultiButton = dynamic(
 
 // Update image references in the component
 const images = {
-  hero: '/image1.png',
-  features: '/image2.png',
-  market: '/image3.png',
-  footer: '/image4.png'
+  hero: '/image/image1.png',
+  features: '/image/image2.png',
+  market: '/image/image3.png',
+  footer: '/image/image4.png'
 };
 
 export default function LandingPage() {
@@ -65,7 +65,10 @@ export default function LandingPage() {
           })
       )
     )
-      .then(() => setImagesLoaded(true))
+      .then(() => {
+        console.log('All images loaded successfully');
+        setImagesLoaded(true);
+      })
       .catch(error => console.error('Image loading error:', error));
   }, []);
   
@@ -76,15 +79,9 @@ export default function LandingPage() {
     // Log if images exist at the paths
     const checkImages = async () => {
       try {
-        const img1 = await fetch('/image1.png');
-        const img2 = await fetch('/image2.png');
-        const img3 = await fetch('/image3.png');
-        const img4 = await fetch('/image4.png');
+        const img = await fetch('/image/image1.png');
         
-        console.log('Image1 status:', img1.status);
-        console.log('Image2 status:', img2.status);
-        console.log('Image3 status:', img3.status);
-        console.log('Image4 status:', img4.status);
+        console.log('Image status:', img.status);
       } catch (error) {
         console.error('Error checking images:', error);
       }
@@ -177,6 +174,22 @@ export default function LandingPage() {
   
   return (
     <main className="flex min-h-screen flex-col items-center bg-black text-white overflow-hidden">
+      {/* Debug component to test image loading - this will be visible at the top of the page */}
+      <div className="fixed top-0 left-0 z-50 bg-black/80 text-white p-4 m-2 rounded-lg max-w-sm">
+        <p>Image loaded: {imagesLoaded ? 'Yes' : 'No'}</p>
+        <div className="mt-2 flex items-center gap-2">
+          <p>Test image:</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src="/image/image1.png" 
+            alt="Test" 
+            className="w-10 h-10 object-cover rounded"
+            onLoad={() => console.log('Debug image loaded!')}
+            onError={() => console.error('Debug image failed to load!')}
+          />
+        </div>
+      </div>
+      
       {/* Background effects */}
       <GridBackground animate={true} spacing={30} />
       <FloatingTokens count={20} />
@@ -226,7 +239,7 @@ export default function LandingPage() {
         <div className="absolute inset-0 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/image1.png"
+            src="/image/image1.png"
             alt="Hero Background"
             className="absolute inset-0 w-full h-full object-cover"
           />
@@ -359,7 +372,7 @@ export default function LandingPage() {
         <div className="absolute inset-0 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/image2.png"
+            src="/image/image2.png"
             alt="Feature section background"
             className="absolute inset-0 w-full h-full object-cover"
           />
@@ -446,7 +459,7 @@ export default function LandingPage() {
         <div className="absolute inset-0 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/image3.png"
+            src="/image/image3.png"
             alt="Market section background"
             className="absolute inset-0 w-full h-full object-cover"
           />
@@ -749,7 +762,7 @@ export default function LandingPage() {
         <div className="absolute inset-0 overflow-hidden -z-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/image4.png"
+            src="/image/image4.png"
             alt="Footer background"
             className="absolute inset-0 w-full h-full object-cover"
           />

@@ -49,7 +49,7 @@ export default function LandingPage() {
               The Future of Wealth Creation
             </h1>
             <p className="text-2xl text-gray-300 max-w-3xl mx-auto mb-10">
-              Trade perpetual futures with up to 10x leverage on Solana. 
+              Trade perpetual futures with up to 100x leverage on Solana. 
               Low fees, high performance, and fully on-chain settlement.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-6">
@@ -86,7 +86,7 @@ export default function LandingPage() {
               <div className="text-center">Loading markets...</div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {markets.map(market => (
+                {markets && markets.map(market => (
                   <div 
                     key={market.id} 
                     className="bg-[#1A1F35]/80 backdrop-blur-sm rounded-lg p-6 border border-purple-500/20 hover:border-purple-500/50 transition-all relative group shadow-md"
