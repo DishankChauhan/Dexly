@@ -3,7 +3,7 @@
 
 
 
-Dexly is a high-performance decentralized perpetual futures trading platform built on the Solana blockchain. The platform enables traders to open leveraged long or short positions on crypto assets with up to 10x leverage, all managed through smart contracts deployed on Solana.
+Dexly is a high-performance decentralized perpetual futures trading platform built on the Solana blockchain. The platform enables traders to open leveraged long or short positions on crypto assets with up to 100x leverage, all managed through smart contracts deployed on Solana.
 
 Unlike traditional DEXs that rely on orderbooks, Dexly uses an innovative pricing model with a virtual AMM (Automated Market Maker) design to determine entry and exit prices. This approach allows for deep liquidity while maintaining performance and reducing front-running risks.
 
@@ -12,7 +12,7 @@ Unlike traditional DEXs that rely on orderbooks, Dexly uses an innovative pricin
 Dexly implements a complete perpetual futures trading system with these key components:
 
 1. **Position Management**: Users can open long/short positions with collateral in USDC
-2. **Leverage Control**: Traders can select leverage up to 10x, amplifying potential gains (and losses)
+2. **Leverage Control**: Traders can select leverage up to 100x, amplifying potential gains (and losses)
 3. **Oracle Integration**: Real-time price feeds from Switchboard and Pyth oracles ensure accurate pricing
 4. **Liquidation Engine**: Automated liquidation processes protect the protocol from undercollateralized positions
 5. **Funding Rate Mechanism**: Periodic funding rates balance long and short positions 
@@ -134,7 +134,7 @@ anchor deploy
 Dexly is currently in MVP phase with functional perpetual futures trading. The platform supports:
 
 - SOL/USDC and BTC/USDC markets
-- Up to 10x leverage trading
+- Up to 100x leverage trading
 - Real-time position management
 - Liquidation engine
 
