@@ -1,0 +1,22 @@
+[features]
+seeds = false
+skip-lint = true
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet = "./devnet-wallet.json"
+
+[scripts]
+test = "yarn run mocha -t 1000000 tests/"
+
+[programs.localnet]
+perps = "5YTxWRCWmTsy8JWCncwwKRKQguaigqNXxsDZLAqEJ7LB"
+
+[workspace]
+types = "native"
+
+[workspace.metadata.bpf-program]
+max-len = 1000000
