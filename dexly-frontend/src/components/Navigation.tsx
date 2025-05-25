@@ -8,7 +8,8 @@ export function Navigation() {
   const pathname = usePathname();
 
   const navItems = [
-    { href: '/', label: 'Trade', icon: '📈' },
+    { href: '/', label: 'Home', icon: '🏠' },
+    { href: '/trade', label: 'Trade', icon: '📈' },
     { href: '/portfolio', label: 'Portfolio', icon: '💼' },
     { href: '/leaderboard', label: 'Leaderboard', icon: '🏆' },
   ];
