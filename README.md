@@ -1,5 +1,6 @@
 # Dexly - Decentralized Perpetual Futures Trading on Solana
-![Home](https://github.com/user-attachments/assets/5d278f12-b682-425e-8c99-2e90c46a4c68)
+![Loom Screenshot 2025-05-26 at 12 45 41](https://github.com/user-attachments/assets/35f3ad0c-8423-47ad-a5d1-018f705b6e7b)
+
 
 
 
